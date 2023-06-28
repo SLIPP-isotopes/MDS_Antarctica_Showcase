@@ -38,6 +38,7 @@ def main(out_dir='data/', input_dir='data/', input_file='IsoGSM/Total.IsoGSM.ERA
     - Saves the preprocessed datasets as NetCDF files in the specified output directory.
     - If return_data is True, the preprocessed datasets are returned as a tuple.
     """
+    print("Preprocessing data. This may take a couple minutes.")
     # Load Data
     file = input_dir + input_file
     raw_ds = xr.open_dataset(file)
@@ -50,13 +51,23 @@ def main(out_dir='data/', input_dir='data/', input_file='IsoGSM/Total.IsoGSM.ERA
     raw_train = raw_ds.sel(time=TRAIN_YEAR_RANGE, latitude=LAT_RANGE)
     raw_valid = raw_ds.sel(time=VALID_YEAR_RANGE, latitude=LAT_RANGE)
     
+    print("Processing training data...")
     train_ds = preprocess(raw_train, is_training_data=True)
+    print("\tComplete.")
+
+    print("Processing validation data...")
     valid_ds = preprocess(raw_valid, is_training_data=False, train_ds=train_ds)
+    print("\tComplete.")
+
+    print("Processing validation data...")
     test_ds = preprocess(raw_test, is_training_data=False, train_ds=train_ds)
+    print("\tComplete.")
 
     train_ds.to_netcdf(path=out_dir + 'preprocessed_train_ds.nc')
     valid_ds.to_netcdf(path=out_dir + 'preprocessed_valid_ds.nc')
     test_ds.to_netcdf(path=out_dir + 'preprocessed_test_ds.nc')
+
+    print("Preprocessing completed.")
 
     if return_data:
         return (train_ds, valid_ds, test_ds)

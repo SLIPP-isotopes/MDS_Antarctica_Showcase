@@ -62,62 +62,74 @@ The RMSE scores the following simple baseline models are used as a comparison fo
 
 ### 3. Gaussian Process (GP) Models 
 
-(unfinished)
-
-GP models were first introduced by {INSERT CITATION}. A GP model extends the OLS model in a way that removes the assumption of uncorrelated observations while also introducing some non-linearity within the model. Assuming that we have a training data set with $n$ observations, let $x_i = [x_{i,1} \ x_{i,2} \ x_{i,3} \ x_{i,4} \ x_{i,5}]^T$ denote the corresponding observed values of the model's input variables, where:
-
-$$
-\begin{align*}
-    x_{i,1} &= \text{delta-18O} \\
-    x_{i,2} &= \text{UPS Easting} \\
-    x_{i,3} &= \text{UPS Northing} \\
-    x_{i,4} &= \text{Distance-to-coast} \\
-    x_{i,5} &= \text{Surface Altitude} \\
-\end{align*}
-$$
-
-where $i = 1,\dots,n$ and $n$ is the number of training examples. See table 3.1 for more details on the GP model's input variables.
-
-The GP model can be defined as:
-
-$$
-y_i = \mu(\mathbf{x}_i) + Z(\mathbf{x}_i)
-$$
-
-where:
+#### Mathematical Background of Gaussian Processes
 
 
-$$
-\mu(\mathbf{x}_i) = ...
-$$
+Gaussian Process (GP) models were first introduced by Sacks et al. (1989).
+A GP model extends the ordinary least squares (OLS) regression model in a way that offers more model flexibility by accommodating non-linear relationships and capturing the correlation structure of the data.
 
-$$... = \beta_0 + \sum_{k=1}^5 \beta_k x_{i,k},$$
+Assuming that we have a training data set with $n$ observations, let $y_i$ denote the $i\text{th}$ observed value of a specific climate variable (e.g. temperature
+or precipitation), and let
+```math
+\mathbf{x}_i = \begin{pmatrix} {x}_{i,1}\ {x}_{i,2}\ {x}_{i,3}\ {x}_{i,4}\ {x}_{i,5} \end{pmatrix}^\intercal = \begin{pmatrix} \delta^{18}\text{O}_i\  \text{E}_{\text{UPS}, i}\  \text{N}_\text{UPS, i}\ \text{oro}_i \ d_{\text{coast}, i} \end{pmatrix}^\intercal \qquad (1)
+```
+denote the corresponding observed values of the ML model’s input variables (as prepared in the preprocessed dataset; see table 3.1).
 
-$$
-Z(\mathbf{x}_i) \quad \overset{\text{marginal}}{\sim} \mathcal{N}(0, \sigma^2),
-$$
+Recall that an OLS regression model relates the input variables in $\mathbf{x}$ to an output variable $y$ via a linear equation:
 
-$$
-\text{Cov}(Z(\mathbf{x}_i), Z(\mathbf{x}_j)) = \sigma^2 R(\mathbf{x}_i, \mathbf{x}_j).
-$$
+```math
+y_i = \beta_0 + \mathbf{\beta}^\intercal \mathbf{x}_i + \varepsilon_i \qquad (2)
+```
 
-The kernel function $R$ that models the correlation between observations is given by:
+In $(2)$, $\beta_0$ is a scalar, $\mathbf{\beta} = \begin{pmatrix} \beta_1\ \beta_2\ \beta_3\ \beta_4\ \beta_5\ \end{pmatrix}^\intercal$ is a vector of scalar coefficients, and $\varepsilon_i$ is a random variable. The parameter $\beta_0$ represents the linear model's intercept, and the parameters in $\mathbf{\beta}$ represent the linear model's slope with respect to each of the model's input variables. Further, the random variable $\varepsilon_i$ represents the model's error-term.  This term is assumed to be independently identically distributed as $\epsilon_i\sim\mathcal{N}(0,\sigma^2)$ for all $i = 1,\dots, n$, where $\sigma^2$ is the common variance of the error-terms.
 
-$$
-R(\mathbf{x}_i, \mathbf{x}_j) = ...,
-$$
+The assumption of a linear relationship between input and output variables is quite restrictive in the sense that it does not allow for modelling complex non-linear relationships. Further, the independence assumption of OLS does not hold for climate data due to the spatial-temporal nature of such data. As such, we believe that better model performance† can be achieved by utilizing models that can accommodate both non-linearity and non-independence (†performance as measured by various metrics; see the postprocessing section for more details).
 
-$$
-... = \prod_{k=1}^5 K_{\text{RBF}}(x_{i,k}, x_{j,k})
-$$
+One such model is a GP model, which relates the input variables in $\mathbf{x}$ to an output variable $y$ via an equation quite similar to $(2)$ from OLS:
 
-$$
-= \prod_{k=1}^5 \exp \left( -\frac{1}{2} \theta_k^{-2} \left|x_{i,k} - x_{j,k} \right|^2 \right)
-$$
+```math
+y_i = \beta_0 + \mathbf{\beta}^\intercal \mathbf{x}_i + Z(\mathbf{x}_i) \qquad (3)
+```
 
-To implement GP models for our project, we will consider different kernel configurations and split our data into training and validation sets. The training set will be used to fit the GP model, while the validation set will be used to tune hyperparameters and select the best kernel configuration.
+In $(3)$, $\beta_0$ and $\mathbf{\beta}$ are the same as they were in $(2)$ (i.e. intercept and slopes). The random variable $\epsilon_i$ from $(2)$ has been replaced by a different random variable $Z(\mathbf{x}_i)$, and, as before, this stochastic term represents the model's error-term. However, this error-term $Z(\mathbf{x}_i)$ is **not** assumed to be independent for all $i = 1,\dots, n$. Instead, a GP model assumes that the error-terms follow an identical _marginal_ distribution $Z(\mathbf{x}_i)\overset{\text{marginal}}{\sim}\mathcal{N}(0, \sigma^2)$ for all $i = 1,\dots, n$, where $\sigma^2$ is the common variance of the error-terms (also known as the 'overall process variance').
 
-**Table 3.1: Input (X) and Output (Y) Variables**
+The key distinction between OLS models and GP models lies in their correlation structure. While the OLS model assumes no correlation between error terms ($\text{Cor}(\varepsilon_i, \varepsilon_j) = 0 \text{ for }i \neq j$), a GP model assumes that observations have a correlation structure which is determined by a correlation function $R(·\ ,\ ·)$:
+```math
+\text{Cor}(Z(\mathbf{x}_i), Z(\mathbf{x}_j)) = R(\mathbf{x}_i, \mathbf{x}_j)\in[0,1] \qquad (4)
+```
+The correlation function $(4)$ is often decomposed into a product of kernel functions $\mathcal{K}(.\ ,\ .)$. Recall that we have $5$ input features, as specified in $(1)$. Thus, we have:
+```math
+\begin{aligned}
+  R(\mathbf{x}_i, \mathbf{x}_j) &= \prod_{k=1}^5 \mathcal{K}_k({x}_{i,k},\ {x}_{j,k}) \quad &(5)\\
+    &=  \mathcal{K}_1(\delta^{18}\text{O}_i,\ \delta^{18}\text{O}_j)  & \\ & \quad \times \mathcal{K}_2( \text{E}_{\text{UPS}, i}\, \text{E}_{\text{UPS}, j}) \times  \mathcal{K}_3(\text{N}_\text{UPS, i}\, \text{N}_\text{UPS, j})  & \\ & \quad\times \mathcal{K}_4(\text{oro}_i, \text{oro}_j) \times \mathcal{K}_5(\ d_{\text{coast}, i}, \ d_{\text{coast}, j}) \quad &(6)
+\end{aligned}
+```
+
+A kernel function $\mathcal{K}$  models the correlation between observations as a function of their distance in the input feature space. In supervised machine learning the notion of similarity between data points is crucial; it is a basic assumption that points with input features $x$ which are close are likely to have similar target values $y$, and thus training points that are near to a test point should be informative about the prediction at that point. In a GP model it is the kernel functions $\mathcal{K}$ that defines closeness or similarity [insert citation].
+
+In addition to allowing GP models to capture correlation between variables, the use of kernel functions also allows GP models to model non-linear relationships. The GP model equation $(3)$ includes a linear regression component, but kernel functions can be (and usually are) non-linear.  
+There are many kernel functions available in the literature (Duvenaud 2014).
+For example, there are kernel functions which are able to directly model seasonal temporal correlation structures (Roberts et al. 2013). The kernel function is the crucial ingredient in a GP model since it encodes our assumptions about the correlation structures of the data [insert citation].
+Thus, we dedicated a large amount of effort to selecting the most appropriate kernel functions.
+
+For our project, we primarily used Radial Basis Functions (RBFs) as our kernel function:
+```math
+\mathcal{K}_{\text{RBF}}({x}_i,\ x_j) = \exp \left( -\frac{1}{2}\frac{   |{x_i} - {x_j}| }{\theta^2}
+\right) \qquad (7)
+```
+This function assigns values near to $1$ for variables with similar corresponding inputs and decreases the covariance exponentially as the distance between inputs increases. It includes a learned parameter $\theta$ which controls the rate of exponential decay for the covariance with respect to the input feature's distance. In the context of this project, we can combine equations $(4)$ through $(7)$ to see that our GP model's correlation function was given by:
+```math
+\begin{aligned}
+\text{Cor}(Z(\mathbf{x}_i), Z(\mathbf{x}_j)) &= \prod_{k=1}^5 \mathcal{K}_{\text{RBF}}({x}_{i,k},\ {x}_{j,k}) \quad &(8) \\
+&= \exp\left( -\frac{1}{2}\frac{   |\delta^{18}\text{O}_i,\ \delta^{18}\text{O}_j)| }{\theta_1^2}\right)  & \\ & \qquad \times\exp\left( -\frac{1}{2}\frac{   |\text{E}_{\text{UPS}, i}\, \text{E}_{\text{UPS}, j}| }{\theta_2^2}\right) \times \exp\left( -\frac{1}{2}\frac{   |\text{N}_{\text{UPS}, i}\, \text{N}_{\text{UPS}, j}| }{\theta_3^2}\right)  &  \\ & \qquad \times \exp\left( -\frac{1}{2}\frac{   |\text{oro}_i, \text{oro}_j| }{\theta_4^2}\right)  \times \exp\left( -\frac{1}{2}\frac{   |d_{\text{coast}, i}, \ d_{\text{coast}, j}| }{\theta_5^2}\right)  \quad &(9)\\
+\end{aligned}
+```
+
+Importantly, notice that in $(9)$ there is a distinct parameter $\theta_k$ for each of the $5$ input features.
+
+The GP models offer a powerful framework for capturing non-linear relationships and accounting for the correlation structure present in the data. By leveraging the flexibility of the kernel function, GP models have the potential to provide improved predictions of temperature, geopotential height, and precipitation compared to linear regression models like OLS.
+
+**Table 3.1: GP Model Input (X) and Output (Y) Variables**
 
 | Input Variables                                      | Output Variables                              |
 |------------------------------------------------------|-----------------------------------------------|
@@ -134,9 +146,32 @@ To implement GP models for our project, we will consider different kernel config
    >
    > †† The "month" variable is only included for certain kernels (those with an even ID). This variable is an integer where Jan=1 and Dec=12. 
 
-#### GP Kernels
+#### GPyTorch Kernels
 
-See:
+In addition to RBF kernels, we explored some alternative GP kernel functions. We prepared a total of 7 different pre-made kernel configurations that can be easily loaded using the `get_kernel()` function from `GaussianProcesses.kernels`. An overview of these kernel configurations is provided in table 3.2. See the [kernel guide](/guides/GaussianProcesses/kernels.md) for more information.
+
+
+**Table 3.2: Kernel Configurations**
+
+| Kernel ID | `GPyTorch` Kernels used           | Uses month as an input variable? |
+|-----------|----------------------------------|----------------------------------|
+| 0         | `RBFKernel` + `PeriodicKernel`        | Yes (non-deseasonalized data)    |
+| 1         | `RBFKernel`                        | No (deseasonalized data)         |
+| 2         | `PiecewisePolynomialKernel` + `PeriodicKernel`  | Yes (non-deseasonalized data)    |
+| 3         | `PiecewisePolynomialKernel`        | No (deseasonalized data)         |
+| 4         | `RQKernel` + `PeriodicKernel`          | Yes (non-deseasonalized data)    |
+| 5         | `RQKernel`                        | No (deseasonalized data)         |
+| 6         | NA                               | NA                               |
+| 7         | `SpectralMixtureKernel`             | No (deseasonalized data)         |
+
+> Table 3.2 provides information on the kernel configurations used in the GP models. It lists the kernel IDs, the corresponding `GPyTorch` kernels used, and whether the month is used as an input variable. It also presents the equation that represents the kernel for each configuration. Please note that kernel 6 (NA) does not exists because the `SpectralMixtureKernel` cannot be combined with the `PeriodicKernel`.
+
+- Note that we use a [`PeriodicKernel`](https://docs.gpytorch.ai/en/stable/kernels.html#periodickernel) for the `month` feature if it is included.:
+   - The `month` feature is included if the training data is *not* deseasonalized, but `month` is *not* included if the training data **is** deseasonalized.
+   - Kernels with an even ID use the `month` feature and don't deseasonalize. Kernels with an odd ID deseasonalize and don't use the `month` feature.
+
+Relevant `GPyTorch` documentation:
+
 - [RBFKernel](https://docs.gpytorch.ai/en/stable/kernels.html#rbfkernel)
 - [PiecewisePolynomialKernel](https://docs.gpytorch.ai/en/stable/kernels.html#piecewisepolynomialkernel)
 - [RQKernel](https://docs.gpytorch.ai/en/stable/kernels.html#rqkernel)
@@ -144,28 +179,11 @@ See:
 - [PeriodicKernel](https://docs.gpytorch.ai/en/stable/kernels.html#periodickernel)
 
 
-**Table 3.2: Kernel Configurations**
-
-| Kernel ID | `GPytorch` Kernels used           | Uses month as an input variable? | Equation                                                                                      |
-|-----------|----------------------------------|----------------------------------|-----------------------------------------------------------------------------------------------|
-| 0         | RBFKernel + PeriodicKernel        | Yes (non-deseasonalized data)    |                              |
-| 1         | RBFKernel                        | No (deseasonalized data)         |                                                               |
-| 2         | PiecewisePolynomialKernel + PeriodicKernel | Yes (non-deseasonalized data)    |                |
-| 3         | PiecewisePolynomialKernel        | No (deseasonalized data)         |                                                 |
-| 4         | RQKernel + PeriodicKernel         | Yes (non-deseasonalized data)    |                            |
-| 5         | RQKernel                         | No (deseasonalized data)         |                                                                  |
-| 6         | NA                               | NA                               | NA                                                                                            |
-| 7         | SpectralMixtureKernel             | No (deseasonalized data)         |                                              |
-
-> Table 3.2 provides information on the kernel configurations used in the GP models. It lists the kernel IDs, the corresponding `GPytorch` kernels used, and whether the month is used as an input variable. It also presents the equation that represents the kernel for each configuration. Please note that kernel 6 (NA) indicates that the SpectralMixtureKernel cannot be combined with the PeriodicKernel.
-
-Note that we use a [PeriodicKernel](https://docs.gpytorch.ai/en/stable/kernels.html#periodickernel) for the `month` feature if it is included. The `month` feature is included if the training data is *not* deseasonalized, but `month` is *not* included if the training data **is** deseasonalized.
-Kernels with an even ID use the `month` feature and don't deseasonalize. Kernels with an odd ID deseasonalize and don't use the `month` feature.
-
-
 #### Training GP Models (Sockeye)
 
 Training GP models involves the computation of pairwise distances between all training data points in a matrix, which requires large memory and time resources. To overcome this challenge, we obtained computational resources from [UBC ARC Sockeye](https://arc.ubc.ca/ubc-arc-sockeye), which allowed us to use computational nodes of up to 186 GB. We also reduced our training dataset of 26 years and ~780,000 examples into smaller splits of a few consecutive years each. See table 3.3 for more information. 
+
+To implement GP models for our project, we will consider different kernel configurations and split our data into training and validation sets. The training set will be used to fit the GP model, while the validation set will be used to tune hyperparameters and select the best kernel configuration.
 
 **Table 3.3: GP Model Details and Validation RMSEs on Scaled Anomalies**
 
