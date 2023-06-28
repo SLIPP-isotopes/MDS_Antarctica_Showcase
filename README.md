@@ -159,8 +159,6 @@ The steps can either be run on a Jupyter Notebook or using the command line (wit
 
 #### 1. Data Preprocessing
 
-**Note: data preprocessing has already been run, and the preprocessed data files uploaded to data/preprocessed/ in this showcase repository.** 
-
 This step converts the raw IsoGSM climate data into preprocessed data ready to be used in models. It also performs the train/valid/test split.
 
 *Demo Notebook*
@@ -196,13 +194,13 @@ preprocessed_test_ds.nc    preprocessed_train_ds.nc    preprocessed_valid_ds.nc
 Run the script `bl_main.py`, specifying that the variable `hgtprs` (-v 0) should be predicted using the baseline method "ols", and that we should predict on the validation set. Prediction files will be saved under `results/predictions/baseline/`. Estimated run-time: 1 - 10 seconds.
 
 ```
-$ python src/Baselines/scripts/bl_main.py -o 'results/predictions/baseline/' -d 'data/preprocessed/' -v 0 -b 'ols' -vt 'valid' -verbose 1
+$ python src/Baselines/scripts/bl_main.py -o 'results/predictions/' -d 'data/preprocessed/' -v 0 -b 'ols' -vt 'valid' -verbose 1
 
 # Check that the prediction files were generated correctly: 
-$ ls results/predictions/baseline/
+$ ls results/predictions/
 
 # Expected output
-bl_ols_hgtprs_valid_preds.nc   
+ols_hgtprs_valid_preds.nc  
 ```
 To generate predictions for the rest of the variables, repeat the above command two more times. Each time, only modify the "-v" argument (1 for `pratesfc`, 2 for `tmp2m`). 
 
@@ -217,23 +215,23 @@ To generate predictions for the rest of the variables, repeat the above command 
 
 > [Gaussian Process Models command line guide](docs/guides/GaussianProcesses/main.md)
 
-The following line calls the `gp_main.py` script, specifying the output and data directories on Sockeye. It creates a GP model to predict the variable `hgtprs` (-v 0) using kernel configuration 1 (-k 1). It creates **100 splits** of the training data (-n 100) and fits the model on split 0 (-s 0). Finally, it sets the number of epochs to 10 (-e 10), the learning rate to 0.0015 (-l 0.0015), and the mean component to be linear (-m 'linear'). 
+Run the script `gp_main.py`, specifying a GP model to predict the variable `tmp2m` (-v 2) using kernel configuration 1 (-k 1). It creates **100 splits** of the training data (-n 100) and fits the model on split 4 (-s 4). Finally, it sets the number of epochs to 10 (-e 10), the learning rate to 0.0015 (-l 0.0015), and the mean component to be linear (-m 'linear'). 
 
-Estimated run-time: 30 - 60 seconds.
+Estimated run-time: 30 - 60 seconds (due to creating 100 splits with `-n 100`).
 
 ```
-$ python src/GaussianProcesses/scripts/gp_main.py -o 'results/predictions/gp/' -d 'data/preprocessed/' -v 0 -k 1 -n 100 -s 0 -e 10 -l 0.0015 -m 'linear'
+$ python src/GaussianProcesses/scripts/gp_main.py -o 'results/predictions/' -d 'data/preprocessed/' -v 2 -k 1 -n 100 -s 4 -e 10 -l 0.0015 -m 'linear'
 
 Check that the prediction files were generated correctly:
-$ ls results/predictions/gp/
+$ ls results/predictions/
 
 # Expected output 
-gp_hgtprs_k1_m1_n100_s0_e10_l0.0015_cpu_model_state.pth    gp_hgtprs_k1_m1_n100_s0_e10_l0.0015_cpu_valid_preds.nc
+gp_hgtprs_k1_m1_n100_s4_e10_l0.0015_cpu_model_state.pth gp_hgtprs_k1_m1_n100_s4_e10_l0.0015_cpu_valid_preds.nc
 ``` 
 
 **⚠️ NOTE: THIS IS NOT THE FULL TRAINING OF THE GP MODEL ⚠️**  
 
-As seen above, the number of splits of the training data was 100 (-n 100). This creates a dataset of about 7,000 data points, which is far too little for the actual training of a GP model. Thus, the above line of code is for demonstration purposes only, to show how the command is run locally. In our final results, we found that number of splits = 9, or about 87,000 data points per split, was ideal. However, this would be infeasible to run locally. Thus, we require require large computational resources. 
+As seen above, the number of splits of the training data was 100 (-n 100). This creates a dataset of about 7,000 data points, which is far too little for the actual training of a GP model. Thus, the above line of code is for demonstration purposes only, to show how the command is run locally. In our final results, we found that using 9 splits, or about 87,000 data points per split, was ideal. However, this would be infeasible to run locally. Thus, we require require large computational resources. 
 
 #### 4. Neural Network Learning Models 
 
@@ -245,17 +243,17 @@ As seen above, the number of splits of the training data was 100 (-n 100). This 
 
 > [Neural Network Models command line guide](docs/guides/NeuralNetworks/main.md)
 
-Run the script `nn_main.py`, specifying a "CNN-deep2" architecture (-a), 200 epochs (-e), and a seed of 123 (-s). Prediction files will be saved under `results/predictions/nn/`. Estimated run-time: 30 minutes.
+Run the script `nn_main.py`, specifying a "CNN-deep2" architecture (-a), 200 epochs (-e), and a seed of 123 (-s). Prediction files will be saved under `results/predictions/nn/`. Estimated run-time: 30 minutes (reduce the number of epochs to run more quickly).
 
 ```
-$ python src/NeuralNetwork/scripts/nn_main.py -o 'results/predictions/nn/' -d 'data/preprocessed/' -a "CNN-deep2" -e 200 -s 123
+$ python src/NeuralNetwork/scripts/nn_main.py -o 'results/predictions/' -d 'data/preprocessed/' -a "CNN-deep2" -e 200 -s 2023 -l 0.15
 
 # Check that the prediction files were generated correctly
-$ ls results/predictions/nn/
+$ ls results/predictions/
 
 # Expected output 
-nn_CNN-deep2_e200_l0.15_s123_model_state.pt             nn_CNN-deep2_e200_l0.15_s123_training_progress_plot.png
-nn_CNN-deep2_e200_l0.15_s123_train_preds.nc             nn_CNN-deep2_e200_l0.15_s123_valid_preds.nc
+nn_CNN-deep2_e200_l0.15_s2023_model_state.pt             nn_CNN-deep2_e200_l0.15_s2023_training_progress_plot.png
+nn_CNN-deep2_e200_l0.15_s2023_train_preds.nc             nn_CNN-deep2_e200_l0.15_s2023_valid_preds.nc
 ```
 
 #### 5. Results Post-processing 
@@ -268,18 +266,24 @@ nn_CNN-deep2_e200_l0.15_s123_train_preds.nc             nn_CNN-deep2_e200_l0.15_
 
 > [Results Post-processing command line guide](docs/guides/Postprocessing/main.md)
 
-The following line calls the `main.py` script, ... ??? 
+The following command calls the `main.py` script, which applies the postprocessing functions to all the predictions in `results/predictions`.
 
 Estimated run-time: 10 - 30 seconds 
 
 ```
-$ python src/Postprocessing/main.py -d 'results/predictions/nn' -o 'results/postprocessing/' -v 2 -k 0 1 -n 10 -sgp 1 -egp 7 -lgp 0.001 -m 1 -pu 'cpu' -a 'CNN-deep2' 'Linear-narrow' -enn 6 -lnn 0.02 -snn 1234
-
+$ python src/Postprocessing/main.py -d 'results/predictions/' -o 'results/postprocessing/' -v 2 -k 1 -n 100 -sgp 4 -egp 10 -lgp 0.0015 -m 1 -pu 'cpu' -a 'CNN-deep2' -enn 200 -lnn 0.15 -snn 2023
 # Check that the outputs were generated correctly
 $ ls results/postprocessing/
 
 # Expected output 
-???
+gp_tmp2m_k1_m1_n100_s4_e10_l0.0015_cpu_metrics.txt
+gp_tmp2m_k1_m1_n100_s4_e10_l0.0015_cpu_resid_plots.png
+gp_tmp2m_k1_m1_n100_s4_e10_l0.0015_cpu_time_series_plots_original.png
+gp_tmp2m_k1_m1_n100_s4_e10_l0.0015_cpu_time_series_plots_scaled_deseas.png
+nn_tmp2m_CNN-deep2_e200_l0.15_s2023_metrics.txt
+nn_tmp2m_CNN-deep2_e200_l0.15_s2023_resid_plots.png
+nn_tmp2m_CNN-deep2_e200_l0.15_s2023_time_series_plots_original.png
+nn_tmp2m_CNN-deep2_e200_l0.15_s2023_time_series_plots_scaled_deseas.png
 ```
 
 ## License
