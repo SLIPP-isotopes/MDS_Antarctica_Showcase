@@ -7,7 +7,7 @@ The isotopic composition of ice cores (i.e. $δ^{18}O$) is a proxy for understan
 
 Simulated data from the IsoGSM climate model (Yoshimura et al. 2008) was preprocessed and fed into ordinary least squares (OLS) linear regression, Gaussian Process (GP), and Neural Network (NN) models. The models were built in Python scripts (found under [MDS_Antarctica/src/](./src/)) using a variety of libraries (outlined under [Prerequisites](#0-prerequisites)). Cloud computing resources from [Advanced Research Computing](https://arc.ubc.ca/ubc-arc-sockeye) at the University of British Columbia were also used to train computationally intensive GP models. An iterative process was used to try a variety of parameters and architectures. The predictions from each model were evaluated quantitatively using Root Mean Squared Error (RMSE) scores, and qualitatively using heatmaps of residuals. A discussion of the final results of this project can be found in the [final report](./docs/final_report/final_report.pdf). 
 
-This project is far from done and requires more exploration to improve the modeling results. This GitHub repository aims to provide a reproducible and well-documented workflow for future researchers to build upon. Notable next steps include improving the scaling of data during preprocessing and exploring ensemble models. 
+**This repo is a public facing showcase of our work**. It contains all the same code, notebooks, and reports, but the data supplied in the `data` folder has been randomized to ensure our partner's data stays confidential. Thus re-running the workflows will yield different results, but the functionality remains intact. The private repository with the most up to date work on the real data can be found in [SLIPP-isotopes/MDS_Antarctica](https://github.com/ajorsi/MDS_Antarctica).
 
 ## Sections
 
@@ -15,9 +15,7 @@ This project is far from done and requires more exploration to improve the model
 2. [Usage](#usage)
    - [Prerequisites](#0-prerequisites)
    - [Installation](#1-installation)
-   - [Downloading Data](#2-downloading-data)
-   - [Running Locally](#3-running-locally) 
-   - [Running on Cloud](#4-running-on-cloud)
+   - [Running Locally](#2-running-locally) 
 3. [License](#license)
 4. [Acknowledgements](#acknowledgements)
 5. [Authors and Contact](#authors-and-contact)
@@ -25,7 +23,7 @@ This project is far from done and requires more exploration to improve the model
 
 ## About this repository 
 
-The goal of this repository is to help future collaborators understand, reproduce, and build off of our work. Before diving into the code, we recommend gaining an understanding of the background and methods used through the final report and Methods.md. Then, we recommend following the workflow to reproduce the final results through the README.md document. The README.md will guide you in running the demo notebooks and command line scripts. 
+The goal of this repository is showcase our work as part of the requirements of the MDS Capstone 2023. It is a copy of the private "production" repo as of June 28, 2023 with sensitive data removed. Before diving into the code, we recommend gaining an understanding of the background and methods used through the final report and Methods.md. Then, we recommend following the workflow to reproduce the final results through the README.md document. The README.md will guide you in running the demo notebooks and command line scripts. 
 
 _**Background information**_
 
@@ -71,7 +69,7 @@ _**Other parts of this repository**_
 
 1. Data folder: [data/](./data/)
 
-Holds the raw and preprocessed data used in the rest of the project. The directory should be empty upon cloning, and filled with data following the instructions in [Downloading Data](#2-downloading-data).
+Holds the raw and preprocessed data used in the rest of the project. The directory contains fake raw data as well as the preprocessed input files.
 
 2. Images folder: [img/](./img/)
 
@@ -110,10 +108,10 @@ Holds the results from the model and post-processing notebooks/scripts, includin
 **Clone the repository and create the `slipp` environment**
 ```
 # Clone the repository 
-$ git clone git@github.com:SLIPP-isotopes/MDS_Antarctica.git
+$ git clone git@github.com:SLIPP-isotopes/MDS_Antarctica_Showcase.git
 
 # Move into the repository 
-$ cd MDS_Antarctica
+$ cd MDS_Antarctica_Showcase
 
 # Install and create the virtual environment (estimated run time: 2 - 15 minutes)
 $ conda env create -f slipp.yml 
@@ -127,44 +125,7 @@ $ conda activate slipp
 $ conda deactivate 
 ```
 
-### 2. Downloading Data 
-
-The `data/` folder should not have any of the raw or preprocessed data after cloning. To run the rest of the workflow, we need the following files saved under the folder `MDS_Antarctica/data/IsoGSM/`:
-- Total.IsoGSM.ERA5.monmean.nc
-- IsoGSM_land_sea_mask.nc
-- IsoGSM_orogrd.nc
-
-To get these files, you can either transfer the data from Sockeye, or get the data files from a previous member of the project.
-
-**A. Transfer data from Sockeye** 
-
-Before running the following lines of code, ensure you are still in the repository's root (`MDS_Antarctica/`). Ensure that you also have access to Sockeye ([instructions here](./docs/guides/sockeye.md)). The data on Sockeye is located at the following path: `/arc/project/st-aorsi-1/data/`. 
-
-1. Open Cisco AnyConnect, connect to UBC VPN
-
-2. Open the terminal, transfer data (replace "cwl" with your cwl username); estimated run time: 1 - 3 minutes 
-```
-# Transfer data from Sockeye into your local clone 
-$ scp -r cwl@sockeye.arc.ubc.ca:/arc/project/st-aorsi-1/data/IsoGSM ./data
-
-# Enter your password, complete "Duo two-factor login"
-```
-
-3. Make sure the data has been transferred correctly 
-```
-$ ls data/IsoGSM
-IsoGSM_land_sea_mask.nc      IsoGSM_orogrd.nc             Total.IsoGSM.ERA5.monmean.nc
-```
-
-**B. Get the data files from a previous member of the project** 
-
-You may have been given a .zip file containing the raw IsoGSM and additional geographic Antarctica data such as `IsoGSM.zip`. If so, do the following: 
-
-1. Unzip the file
-2. Move the file to `MDS_Antarctica/data/`
-3. Ensure your clone of the repository now has the three required files under the `MDS_Antarctica/data/IsoGSM/` directory as seen above. 
-
-### 3. Running Locally
+### 2. Running Locally
 
 The workflow of our project is as follows:
 
@@ -197,6 +158,8 @@ The steps can either be run on a Jupyter Notebook or using the command line (wit
 ---
 
 #### 1. Data Preprocessing
+
+**Note: data preprocessing has already been run, and the preprocessed data files uploaded to data/preprocessed/ in this showcase repository.** 
 
 This step converts the raw IsoGSM climate data into preprocessed data ready to be used in models. It also performs the train/valid/test split.
 
@@ -270,17 +233,7 @@ gp_hgtprs_k1_m1_n100_s0_e10_l0.0015_cpu_model_state.pth    gp_hgtprs_k1_m1_n100_
 
 **⚠️ NOTE: THIS IS NOT THE FULL TRAINING OF THE GP MODEL ⚠️**  
 
-As seen above, the number of splits of the training data was 100 (-n 100). This creates a dataset of about 7,000 data points, which is far too little for the actual training of a GP model. Thus, the above line of code is for demonstration purposes only, to show how the command is run locally. In our final results, we found that number of splits = 9, or about 87,000 data points per split, was ideal. However, this would be infeasible to run locally. Thus, we require require large computational resources - jump to [Running on Cloud](#4-running-on-cloud) for instructions. 
-
-For example, the following line calls the `gp_main.py` script, specifying the output and data directories on Sockeye. It creates 9 splits of the training data (-n 9). The command will actually be placed inside of a job script. 
-
-Estimated run-time: 2 - 6 hours.
-
-```
-# DO NOT RUN THE CODE BELOW. It will be run inside a job script, not at the command line 
-$ python /arc/project/st-aorsi-1/MDS_Antarctica/src/GaussianProcesses/scripts/gp_main.py -o '/scratch/st-aorsi-1/wenlansz/outputs/' -d '/arc/project/st-aorsi-1/data/preprocessed/' -v 0 -k 1 -n 9 -s 0 -e 10 -l 0.0015 -m 'linear'
-``` 
-The above command should be repeated for the rest of the 9 splits, and for the rest of the 3 variables; i.e. 27 total commands/jobs.
+As seen above, the number of splits of the training data was 100 (-n 100). This creates a dataset of about 7,000 data points, which is far too little for the actual training of a GP model. Thus, the above line of code is for demonstration purposes only, to show how the command is run locally. In our final results, we found that number of splits = 9, or about 87,000 data points per split, was ideal. However, this would be infeasible to run locally. Thus, we require require large computational resources. 
 
 #### 4. Neural Network Learning Models 
 
@@ -328,109 +281,6 @@ $ ls results/postprocessing/
 # Expected output 
 ???
 ```
-
-### 4. Running on Cloud 
-
-Gaussian process models require large computation power in order to train on large sets of data. Thus, access to cloud computing is required. Our project was completed using the computing resources provided by [UBC Arc Sockeye](https://arc.ubc.ca/ubc-arc-sockeye). 
-
-A full, detailed guide on using Sockeye can be found here: [sockeye.md](./docs/guides/sockeye.md). It is recommended that you read this guide before continuing to submit jobs using the steps below. 
-
-The steps below assume that you already have an account with access to Sockeye set-up, and that you are part of the `st-aorsi-1` group (and thus have access to the directories in this allocation). They are also the minimum basic requirements needed to set-up and submit a job. 
-
-1. Open Cisco AnyConnect, connect to UBC VPN
-2. SSH into Sockeye (replace "cwl" with your cwl username)
-```
-$ ssh cwl@sockeye.arc.ubc.ca
-
-# Enter your password, complete "Duo two-factor login"
-```
-
-3. Move to the scratch directory where job scripts are stored 
-```
-$ cd /scratch/st-aorsi-1/job-scripts
-```
-
-4. Write a job script (replace "gp_job.pbs" with a more descriptive name)
-```
-# Create and edit the script using the vim text editor
-$ vi gp_job.pbs
-```
-
-**Template job script**
-
-Copy and paste the template below to your job script. Then, change the sections marked with "##EDIT" to fit the specifics of your job. More detailed information about writing job scripts is found here: [sockeye.md](./docs/guides/sockeye.md). 
-
-You should be copying the line from [Running Locally](#3-running-locally) - 3. Gaussian Process Models - Command line, and pasting it under "# Add your commands here" in the job script. 
-
-Remember that running this line of code takes 2 - 6 hours. The estimated memory requirement is ~150 GB. 
-
-`gp_job.pbs`:
-```
-#!/bin/bash 
-
-#PBS -l walltime=8:00:00,select=1:ncpus=1:mem=186gb ##EDIT
-#PBS -N gp_job_01 ##EDIT
-#PBS -A st-aorsi-1
-#PBS -m abe
-#PBS -M wenlansz@student.ubc.ca ##EDIT
-#PBS -o /scratch/st-aorsi-1/o-files/
-#PBS -e /scratch/st-aorsi-1/e-files/
-
-#############################################
-
-# Change the directory into the job directory
-cd $PBS_O_WORKDIR
-
-# Load conda environment
-source ~/.bashrc
-
-# Activate conda environment
-conda activate /arc/project/st-aorsi-1/shared/miniconda3/slipp_sockeye
-
-# Add your commands here
-python3 /arc/project/st-aorsi-1/MDS_Antarctica/src/GaussianProcesses/scripts/gp_main.py -o '/scratch/st-aorsi-1/outputs/' -d '/arc/project/st-aorsi-1/data/preprocessed/' -v 0 -k 1 -n 9 -s 0 -e 10 -l 0.0015 -m 'linear' ##EDIT
-
-# Deactivate environment
-conda deactivate
-```
-
-Save the file and quit the vim text editor. 
-
-5. Submit the job (the flag "-A" is used to specify the allocation name)
-```
-$ qsub -A st-aorsi-1 gp_job.pbs
-```
-
-6. Monitor the job (replace "cwl" with your cwl username )
-```
-# Check the status of your submitted jobs
-$ qstat -u cwl 
-
-# Check the status with MORE information 
-$ qstat -xf job-ID 
-```
-
-7. Move the outputs to the project directory (the "*" is a wildcard indicating "all files in the directory")
-```
-$ mv /scratch/st-aorsi-1/outputs/* /arc/project/st-aorsi-1/outputs 
-```
-
-8. Transfer the outputs to your local computer, in your cloned github repository for further post-processing 
-
-```
-# Logout of Sockeye to return to your local computer (or alternatively, you could open a new command line interface/terminal window)
-$ logout
-
-# On your local computer, navigate to the MDS_Antarctica/ repository
-$ cd path/to/MDS_Antarctica
-
-# Use scp to transfer files from Sockeye to the repository (replace "cwl" with your cwl username)
-$ scp -r cwl@sockeye.arc.ubc.ca:/arc/project/st-aorsi-1/outputs/* results/predictions/gp/
-
-# Enter your password, complete "Duo two-factor login"
-```
-
-Now, you have ".nc" files ready to be given to post-processing. 
 
 ## License
 
