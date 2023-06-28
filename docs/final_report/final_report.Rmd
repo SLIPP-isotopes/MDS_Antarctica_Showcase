@@ -703,14 +703,10 @@ on this project is warranted.
 2.  Develop sequential and/or ensemble models that use the models we
     developed as inputs so we can leverage the strenghts of both models.
 3.  Generalize the workflow so it can be applied to additional climate
-<<<<<<< Updated upstream
-    model data and investigate:
-=======
     model data. Climate models worth investigating include: 
     1. The ECHAM5-wiso climate model [@werner2019echam5]
     2. The LMDZ climate model [@hourdin2020lmdz6a]
 4. Once generalized, compare the results for different climate models to explore:
->>>>>>> Stashed changes
     1.  Whether the models we trained on the IsoGSM data set generalize
         well when applied to other climate models, and
     2.  Whether models trained on data from different climate models
