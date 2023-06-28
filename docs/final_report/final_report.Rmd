@@ -1,0 +1,605 @@
+---
+title: ''
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    includes:
+      before_body: title.sty
+  github_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_depth: '3'
+    df_print: paged
+editor_options:
+  markdown:
+    wrap: 72
+bibliography: final_report_refs.bib
+link-citations: yes
+fontsize: 11pt
+linestretch: 1.5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+install.packages('here')
+library(here)
+```
+
+\newpage
+
+## 1. Executive Summary
+
+The isotopic composition of ice cores (i.e. $\delta^{18}O$) is a proxy
+for understanding historical climate and its variability in Antarctica.
+Our project aims to model the relationship between $\delta^{18}O$ and
+three climate variables: temperature, precipitation, and geopotential
+height. We preprocess data simulated from a climate model, build
+Gaussian Process and Neural Network models to predict outcomes across
+space and time, and analyze the accuracy and precision of our models
+using residuals. Our Neural Network model had the best performance, but
+struggled with predicting precipitation. Our project delivers a
+reproducible and well-documented workflow for future researchers to
+improve upon. Notable next steps include improving the scaling of data
+during preprocessing and exploring ensemble models.
+
+\newpage
+
+## 2. Introduction
+
+### Background
+
+The earliest climate observations in Antarctica date back to 1958, when
+the first weather stations were set up [@bromwich2013central]. To
+characterize the climate before this time, scientists study water-stable
+isotopic records in ice cores dating back thousands of years
+[@stenni2017antarctic]. One such measure is the isotopic composition of
+Oxygen in precipitation, expressed as $\delta^{18}O$ (delta Oxygen-18).
+This measure can act as a proxy to estimate key climate variables such
+as temperature, precipitation, and geopotential height (see Table 1).
+
+$\delta^{18}O$ reflects a ratio of the heavy oxygen isotope $^{18}O$ to
+the light isotope $^{16}O$ in a sample of water (see
+[Appendix](#appendix) for equation). Broadly speaking, warmer
+temperatures result in more $^{18}O$ in the ice cores, since the heavier
+$^{18}O$ isotopes require more energy than $^{16}O$ to evaporate
+[@mulvaney2004past]. Precipitation processes also affect $\delta^{18}O$,
+as the heavier isotope preferentially precipitates before the lighter
+one. Finaly geopotential height is a measure of the height above the
+Earth's surface of a specific level in the atmosphere [add citation].
+Patterns in this climate variable affect the pathways of air masses,
+guides the travel paths of temperature and moisture
+[@Associationsbetween18OofWaterandClimateParametersinaSimulationofAtmosphericCirculationfor197995].
+This impacts the movement of precipitation, and hence $\delta^{18}O$ is
+affected [add citation].
+
+Real ice core data is scarce, but $\delta^{18}O$ and other climate
+variables can be estimated uniformly, across Antarctica, over decades,
+and to high accuracy using climate models [@stevens2013atmospheric].
+These models simulate natural processes with computer codes implementing
+complex mathematical equations. They can be extremely computationally
+intensive, requiring significant computing time and resources to run
+[@bastos2009diagnostics]. As a consequence, building surrogate models,
+or simplified models which use data from climate models to approximate
+them, becomes valuable. Surrogate models are faster to run and flexible,
+allowing researchers to model a wider range of scenarios [add citation].
+
+Previous research has build surrogate models using linear regression
+with ordinary least squares (OLS) to model the relationship between
+$\delta^{18}O$ and temperature [@stenni2017antarctic]. Building upon
+this research, our project will use more powerful data science
+techniques on data obtained from the *IsoGSM* climate model
+[@yoshimura2008historical] to model the relationships between the
+isotopic composition of Oxygen in precipitation and key climate
+variables (outlined in Table 1 below).
+
+```{r var_defs, echo=FALSE}
+var_defs <- data.frame(
+  Variable = c('$\\delta^{18}O$', 'Temperature', 'Precipitation Rate', 'Geopotential Height'),
+  Definition = c('Delta Oxygen-18 in precipitation (‰)', 
+                  'Air temperature 2 metres above the surface (K)', 
+                  'Rate of precipitation reaching the Earth\'s surface (mm/s)',
+                  'A vertical coordinate relative to Earth\'s mean sea level at 500 milibars (1/2 the atmosphere) (m)')
+)
+
+knitr::kable(var_defs,
+             caption = "Definitions of key climate variables for this project.") 
+```
+
+### Research Question
+
+The question guiding our project is as follows:
+
+> *"Can we build surrogate models using simulated climate data which
+> yield accurate and precise predictions of **temperature**,
+> **geopotential height**, and **precipitation** across Antarctica?"*
+
+### Objectives
+
+Our research question will be broken down into the following two To
+address our research question, our project aimed to achieve the
+following three objectives:
+
+1.  Implement machine learning (ML) models:
+
+> *Using data from the IsoGSM climate model, implement Gaussian Process
+> (GP) and neural network (NN) models to predict temperature,
+> precipitation, and geopotential height (*$Y$) from values of
+> $\delta^{18}O$ ($X$).
+
+2.  Examine the predictions of the ML models in terms of accuracy and
+    precision:
+
+> *Use heatmap visualizations to examine the models' predictive
+> performance for (1) different regions of Antarctica and for (2)
+> predicting different climate variables in terms of accuracy (using
+> residuals) and precision (using the standard deviations of
+> residuals).*
+
+3.  Develop reproducible data products implementing our models for
+    future researchers to build upon:
+
+> *Create a comprehensive and readable workflow notebook and GitHub
+> repository with reproducible code, allowing others to examine our
+> results and easily pick-up the project where we left it.*
+
+\newpage
+
+## 3. Data Science Techniques
+
+The workflow of our project is as follows:
+
+1.  Data Preprocessing
+2.  Building Baseline Models
+3.  Building Gaussian Process Models
+4.  Building Neural Network Models
+5.  Results Post-processing (Evaluating RMSE and Residual Plots of
+    Models)
+
+### 3.1. Data Preprocessing {#preprocess}
+
+#### Training, Validation, and Test Splits
+
+The full IsoGSM dataset (42 years) was firstly split into 3 smaller
+datasets:
+
+1.  Training: data from 1995 - 2020 inclusive (26 years). Used to train
+    the models.
+
+2.  Validation: data from 1987 - 1994 inclusive (8 years). Used to
+    continuously evaluate the different ML models.
+
+3.  Test: data from 1979 - 1986 inclusive (8 years). Used at the end of
+    the project to get performance scores of the final ML models chosen.
+
+#### Spatial Features
+
+Due to the variable geographic features of Antarctica, we decided to add
+the following features to our datasets:
+
+1.  **Easting and Northing Coordinates**: Two features representing a
+    projection of the latitude and longitude values to universal polar
+    stereographic coordinates (UPS) with the true latitude scale set to
+    80°S. Distances calculated with these coordinates will be more
+    accurate, which is critical for getting good results, especially
+    from the GP models.
+
+2.  **Distance to Coast**: A measure of the cartesian distance to the
+    nearest coast measured on the scale of the UPS coordinates. Values
+    are positive if the point is over land, and negative if the point is
+    over sea.
+
+3.  **Surface Orography**: The surface height above sea level of each
+    point, in meters.
+
+4.  **Land / Sea Boolean Mask**: A boolean mask where 1 represents a
+    point over land and 0 represents a point over sea. 
+    
+
+#### Temporal Features
+
+$\delta^{18}O$, temperature, geopotential height, and precipitation are
+known to have consistent seasonal patterns. Removing the seasonality is
+important to help our models learn relationships different from these
+temporal patterns. To do this, we computed the monthly "anomalies",
+which are values of the variables after subtracting the monthly mean of
+the variable over all years in the training data (for a specific
+latitude and longitude point):
+
+$$v^{anomaly}_{lat,lon,month} = v_{lat,lon,month} - \bar{v}_{lat,lon,month} \,\,\,\,\,\,\,\text{(1)}$$
+
+Where
+
+-   $v_{lat,lon,month}$: one of the spatial-temporal variables
+    $\delta^{18}O$, temperature, geopotential height, and precipication
+    for a given latitude, longitude, and month
+
+-   $\bar{v}_{lat,lon,month}$: the mean of the variable for a specific
+    latitude, longitude, and month over all years
+
+Note that the spatial features added do not vary with time, and thus did
+not need to be deseasonalized.
+
+#### Scaling
+
+Finally, as our variables differ in units and scale, it was necessary to
+standardize all values (except the land/sea boolean mask) to ensure our
+models treated features equally during training:
+
+$$v^{scaled}_{lat,lon,month} = \frac{v_{lat,lon,month} - \bar{v}}{\hat{\sigma}} \,\,\,\,\,\,\,\text{(2)}$$
+
+Where - $v_{lat,lon,month}$: one of the variables $\delta^{18}O$,
+temperature, geopotential height, precipication, easting/northing,
+distance to coast, and surface orography
+
+-   $\bar{v}$: overall mean of one of the variables to be scaled
+    (regardless of latitude, longitude, or month)
+
+-   $\hat{\sigma}$: overall standard deviation of one of the variables
+    to be scaled (regardless of latitude, longitude, or month)
+
+\newpage
+
+### 3.2. Baseline Models
+
+As a benchmark, we took inspiration from previous research
+[@stenni2017antarctic] to build a simple OLS regression baseline model.
+We related the $\delta^{18}O$ scaled anomalies to the scaled anomalies
+of our three target variables linearly as follows:
+
+$$\hat{y}_{{anomaly,scaled}_i} = \beta_{0_i} + \beta_{1_i}x_{anomaly, scaled} \,\,\,\,\,\,\,\text{(3)}$$
+
+Where - $i$: one of the target variables temperature, geopotential
+height, and precipication
+
+-   $x_{anomaly,scaled}$: the variable $\delta^{18}O$
+
+-   $\hat{y}_{anomaly,scaled}$: the predicted target variable
+
+-   $\beta_{0_i}$: intercept for the corresponding $i$ target variable
+
+-   $\beta_{1_i}$: slope for the corresponding $i$ target variable
+
+Our goal moving forwards was to build more complex GP and NN models
+which would outperform these simple linear models.
+
+\newpage
+
+### 3.3. Gaussian Process Models
+
+[SECTION TO BE FILLED OUT]
+
+Training GP models involve the computation of pairwise distances between
+all training data points in a matrix, which requires large memory and
+time resources. To overcome this challenge, we obtained computational
+resources from UBC ARC Sockeye [<https://arc.ubc.ca/ubc-arc-sockeye>],
+which allowed us to use computational nodes of up to 186 GB. We also
+reduced our training dataset of 26 years and \~780,000 examples into
+smaller splits of a few consecutive years each. Table 1 displays a
+summary of notable configurations run, varying the type of kernel,
+learning rate, number of splits, and validation RMSE scores on the three
+climate variables. It also displays the memory and runtime utilized on
+Sockeye when training the models.
+
+The three kernels used were "RBFKernel" (kernel 1),
+"PiecewisePolynomialKernel" (kernel 2), and "RQKernel" (kernel 3). All
+three displayed similar performances when trained on \~60,000 examples.
+However, we noticed that kernel 1 required less memory resources (72 GB
+compared to \>100 GB), which would allow us to include more examples
+during training. Decreasing the learning rate (from 0.0015 to 0.00075)
+also did not appear to significantly improve RMSE scores, but did
+increase runtime. Thus, we decided to move forwards with a GP model with
+kernel 1, a learning rate of 0.0015, and 9 splits (second last row).
+
+**Table 1. GP Model Details and Validation RMSEs on Scaled Anomalies.**
+Different kernels, learning rates, number of epochs, and splits were
+experimented with when training GP models on Sockeye. RMSE scores
+correspond to the first split (of either 13 or 9) of the training data.
+The row with bolded cells corresponds to the final GP model parameters
+chosen.
+
+| Kernel | Learning Rate | Num. Epochs | Num. Splits | Num. Examples | Temp. RMSE | Geopt. RMSE | Precip. RMSE | Memory (GB) | Runtime (h) |
+|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
+| 1      | 0.15          | 10          | 13          | \~60,000      | 1.14       | 1.18        | 1.08         | 72          | 3-4         |
+| 2      | 0.15          | 10          | 13          | \~60,000      | 1.11       | 1.15        | 1.14         | 155         | 2-3         |
+| 3      | 0.15          | 10          | 13          | \~60,000      | 1.13       | 1.16        | 1.14         | 132         | 1-2         |
+| **1**  | **0.0015**    | **10**      | **9**       | **\~87,000**  | **0.99**   | **1.03**    | **1.00**     | **150**     | **2-3**     |
+| 1      | 0.00075       | 10          | 9           | \~87,000      | 0.98       | 1.03        | 1.00         | 150         | 4-5         |
+
+Table 2 displays the input X variables and target Y variables used in
+the GP models.
+
+**Table 2. Input (X) and output (Y) variables used to train the Gaussian
+Process models.** All variables have been preprocessed following the
+procedure outlined in #Preprocessing.
+
+| Input Variables                                     | Output Variables                            |
+|---------------------------------------|---------------------------------|
+| Scaled & Deseasonalized delta 18-O of precipitation | Scaled & Deseasonalized Temperature         |
+| Scaled Easting Coordinate                           | Scaled & Deseasonalized Geopotential Height |
+| Scaled Northing Coordinate                          | Scaled & Deseasonalized Precipitation Rate  |
+| Scaled Distance to Coast                            |                                             |
+| Scaled Surface Orography                            |                                             |
+
+\newpage
+
+### 3.4. Neural Network Models
+
+In parallel, we also developed deep neural network (NN) models to predict the
+target climate variables. We chose to pursue NN models
+because they can learn complex, non-linear relationships in flexible
+ways, should be capable of handling the the inherent space and time 
+dependencies of our data, and could generate multiple outputs (in this
+case temperature, precipitation, and geopotential height) from a single
+trained model. These models are deep because they contain a series of layers,
+where the shape and style of each layer and their order affect model learning. 
+
+We experimented with several different architectures to see which was more 
+effective at learning our data. These architectures are all combinations of 
+convolutional and/or fully connected (labelled "linear") layers. Convolutional
+layers are designed for spatial pattern recognition in images, 
+and model relationships using only the data nearest to each point 
+along some dimensions (latitude and longitude in our case) [@oshea-2015]. 
+"Linear", fully-connected layers use a "brute-force" approach where 
+the model is not given any prior context about the data 
+(such as which points are close to each other) before training. 
+These layers can capture a wider range of relationships, but might struggle 
+because they are not directed where to look.
+
+[Table 3](#tab3) includes the validation RMSE results of a selected set of 
+neural network architectures that we tried. It's important to note that NN training 
+depends on the random seed used to initialize all the weights in each model. 
+Repeated training of the same architecture with a different seed may yield 
+different training behaviors (such as faster or slower convergence to a stable RMSE) 
+and different final RMSE scores.
+
+#### Table 3. Neural network architecture performance on the validation set. {#tab3}
+Overall RMSE (e.g., performance on all 3 outputs together), as well as 
+RMSE scores specific to temperature, geopotential height, and precipitation are included. 
+Each architecture was trained until there was no improvement in overall
+validation RMSE for `stall limit` consecutive epochs. Total runtime in
+seconds (on the same PC) and total number of epochs trained included.
+All architectures predicted the 3 targets using the 6 input variables
+specified in *[Preprocessing](#preprocess)*. 
+
+| Architecture    | Overall RMSE | Temp. RMSE | Geopt. RMSE | Precip. RMSE | Stall Lim. | Runtime (s) | Num. Epochs |
+|-------------|-------|-------|-------|-------|-------|-------|-------|
+| `CNN-deep2`     | 0.94         | 0.93       | 0.90        | 0.99         | 15         | 2875        | 211         |
+| `CNN-deep`      | 0.97         | 0.93       | 0.93        | 1.04         | 10         | 1484        | 72          |
+| `CNN-simple`    | 0.98         | 0.94       | 0.95        | 1.04         | 10         | 292         | 91          |
+| `Linear-narrow` | 0.99         | 1.01       | 0.86        | 1.09         | 10         | 9           | 108         |
+| `Linear-deep`   | 1.00         | 1.02       | 0.84        | 1.11         | 10         | 64          | 65          |
+| `Hybrid`        | 1.05         | 1.05       | 0.99        | 1.11         | 10         | 58          | 55          |
+
+The architecture `CNN-deep2` had the best overall performance on the
+validation data and so we chose it as our preferred neural network
+model. This architecture consists of 6 convolutional layers with shrinking kernel
+sizes. In each layer, the kernel, or "sliding window", passes
+across the 2-dimensional latitude, longitude axes, learning a fixed set
+of weights which map *x* input channels to *y* output channels (see
+[Table 4](#tab4)). Between each layer, we use rectified linear unit (ReLU) activation
+functions, which have strong performance on deep NNs [@Glorot-2011]. 
+
+#### Table 4. Layer specifications of the `CNN-deep2` neural network architecture. {#tab4}
+Each layer maps *x* input channels to *y* output
+channels using a fixed kernel of size (latitude x longitude). See Figure
+1 for a visualization of the approximate size of each layers' kernel.
+
+| Layer | Input Channels | Output Channels | Kernel Size |
+|-------|----------------|-----------------|-------------|
+| 1     | 6              | 32              | 5 x 17      |
+| 2     | 32             | 32              | 5 x 15      |
+| 3     | 32             | 16              | 5 x 13      |
+| 4     | 16             | 16              | 3 x 13      |
+| 5     | 16             | 8               | 3 x 11      |
+| 6     | 8              | 3               | 3 x 9       |
+
+\newpage
+
+### 3.5. Postprocessing
+
+We evaluated each model's prediction performance for each target
+variable using RMSE scores on the test dataset. To make fair comparisons
+between targets on different scales, we calculate RMSE on the *scaled
+anomaly* data using formula 4, where *n* is the total number of predictions,
+*i* is the *ith* data point, $y_i^{\text{(anomaly, scaled)}}$ is the true 
+target value for *i* and $\hat{y}_i^{\text{(anomaly, scaled)}}$ is 
+the model prediction for *i*.
+
+$$
+\text{RMSE} = \sqrt{\frac{\sum_{i=1}^{n}(y_i^{\text{(anomaly, scaled)}} - 
+\hat{y}_i^{\text{(anomaly, scaled)}})^2}{n}} \,\,\,\,\,\,\,\text{(4)}
+$$
+
+#### Residual Analysis
+
+We also analyzed each model's residuals using a set of 4 plots. 
+The benefit of this type of analysis is it helps identify whether there remains 
+information in the data that a better model could capture, or whether the 
+errors are truly random. It also helps identify whether our models are biased 
+in a consistent way, and whether there are subsets of data that the model 
+appears to perform better on that are worth exploring in isolation.  
+
+Any patterns in the residuals identify shortcomings of the model, and the
+best model should have minimal, consistent residuals which resemble
+random noise. Specifically, we looked for spatial patterns in the
+residuals (whether the model's errors varied over space), temporal
+patterns in the residuals (whether the model failed to capture some
+seasonality), and at the overall distribution of residuals (whether they
+are unbiased and normal looking). See *[Results](#results)* for our residual
+plots and discussions.
+
+\newpage
+
+## 4. Results {#results}
+
+[Table 6](#tab6) details our RMSE results on the test dataset, which was reserved 
+to evaluate the results after model selection. 
+Our best GP models (these are 3 separate models) outperformed the 
+baseline OLS model for all three climate variables. Our best NN model
+performs better than both GP and baseline models for temperature and
+geopotential height, but not precipitation. Notably, all three models have very 
+similar scores predicting precipitation; the advanced models failed to improve 
+on the baseline. 
+
+#### Table 6. RMSE Results on Test Set {#tab6}
+The OLS baseline and best performing GP and NN models were evaluated on the test
+set to predict the scaled anomalies of three climate variables. Residual plots 
+are included for values in bold.
+
+| Model    | Temperature | Geopotential Height | Precipitation |
+|----------|-------------|---------------------|---------------|
+| Baseline | 1.11        | 1.11                | 1.07          |
+| GP       | **1.03**    | 1.04                | **1.04**      |
+| NN       | **0.96**    | **0.96**            | 1.07          |
+
+### Selected Residual Diagnostics Plots
+
+Figure 2 shows the residual plots for the NN model's performance predicting 
+geopotential height. Figure 3 shows the same plots for GP model's performance 
+predicting precipitation. Finally, figures 4 and 5 show the GP and the NN 
+model performance predicting temperature, allowing us to examine their differences.
+
+\newpage
+
+#### 4.1. NN Geopotential Height
+
+&nbsp;
+
+```{r cnn-hgtprs, echo = FALSE, out.width="85%", fig.align = 'center', fig.cap = "Residual plots of NN model predictions of geopotential height. The presence of majority red hues in the average residual plots and left-skew of the binned residuals reveal that the model tends to overpredict geopotential height. There are spatial and temporal patterns to this bias, both in the north-east areas of the continent on the map and in the distinct Antarcitc spring period between June and November. The standard deviation of residuals appears fairly uniform across the map, but there are some darker blues in the south west quadrant, suggesting the model is less consistent there."}
+knitr::include_graphics(here::here("img/NN_results/", "DeepCNN_hgtprs.png"))
+```
+
+\newpage 
+
+#### 4.2. GP Precipitation
+
+&nbsp;
+
+```{r gp-pratesfc, echo = FALSE, out.width="85%", fig.align = 'center', fig.cap = "Residual plots of GP model predictions of precipitation. The top two plots show an unbiased model whose average residuals are near zero almost everywhere. There is also no seasonal pattern to the residuals, and the binned residuals confirm strong central tendency with a very large spike at 0. The standard deviation of residuals map shows the model's weakness: the predictions are erratic and very extreme in all coastal regions of Antarctica. This is where most Antarctic precipitation occurs (Souverijns 2019), so a lack of precision here is problematic."}
+knitr::include_graphics(here::here("img/GP_results/", "GPk1_pratesfc.png"))
+```
+
+\newpage 
+
+#### 4.3. GP Temperature
+
+&nbsp;
+
+```{r gp-tmp2m, echo = FALSE, out.width="85%", fig.align = 'center', fig.cap = "Residual plots of GP model predictions of temperature. Similar to precipitation, the top two plots appear to show relatively low average residuals across space and time. From the spatial plot, there appears to be a pattern of more overprediction (red hues) in the center of the continent, and underprediction (blue hues) around the South East and West coasts. Furthermore, there appears to be some seasonality in that June to November experiences more overprediction, whereas December to May experiences more underprediction."}
+knitr::include_graphics(here::here("img/GP_results/", "GPk1_tmp2m.png"))
+```
+
+\newpage 
+
+#### 4.4. NN Temperature
+
+&nbsp;
+
+```{r cnn-tmp2m, echo = FALSE, out.width="85%", fig.align = 'center', fig.cap = "Residual plots of the neural network predictions of temperature. Similar to its predictions on geopotential height, the model is biased towards slightly overpredicting temperature, especially during the Antarctic spring period between June and November, and to a lesser extent in the north and west areas of the map. The standard deviation of residuals show more precision over land than over the ocean. Some sub-regions, such as the western peninsula, have average residuals close to zero (white) and low standard deviations (yellow-green), suggesting that the model has higher skill predicting temperature there."}
+knitr::include_graphics(here::here("img/NN_results/", "DeepCNN_tmp2m.png"))
+```
+
+\newpage
+
+## 5. Discussion
+
+The Neural Network model had the best overall performance of the models
+we trained, and both the NN and GP models beat the baseline on the test
+data (with the exception of precipication). This is promising because
+the NN models are singificantly less computationally intesive to train,
+and thus easier to use and more flexible to experiment and iterate with. 
+The RMSE scores remain higher than we would hope, but are understandable
+in part because the models are predicting climate anomalies. Learning
+information on top of the seasonal cycle is a harder task because the
+bulk of the variation in temperature, for example, can be explained by
+time of year.
+
+Both models struggled to explain precipitation. We can see from FIGURE_X
+that even though our models show high accuracy, no seasonal patterns,
+and no bias, the model scores poorly because the standard deviations of
+the residuals are extremely high in the coastal regions of Antarctica.
+Here, the model produces both extreme over- and under- predictions with
+approximately equal frequency. Our explanation is that the temporal
+precipitation variance is not constant over space  [@souverijns-2019]. 
+We must take this into account when scaling the data or else we will get
+uncharacteristically good-looking predictions of low variance areas (the
+interior) and also extreme prediction errors in high variance areas (the
+coast), neither of which we want.
+
+Contrasting the GP and NN model residuals plots of temperature (FIGURE_X
+and FIGURE_X) reveals how these models learn differently. The RMSE
+scores from both models were quite close (1.03 vs. 0.96), but the
+residual plots are extremely different. The NN model is noticeably red
+in the average residual plots and shows the bias towards overprediction
+that seems to be characteristic of this model. The GP model, by
+contrast, does not show much bias in the average resdiual plots and its
+residual histogram looks balanced. GP model scores worse because the
+predictions are less precise - the standard deviation of residuals plot
+is slightly darker in all regions. This is an interesting case of the
+bias-variance tradeoff that we were not expecting to find.
+
+Across all models, we noticed a drop in prediction accuracy between the
+validation and test sets. For example, the RMSE score of the neural
+network model predicting temperature falls from 0.92 on validation to
+0.96 on test. This means there are somewhat significant differences
+between these two data splits, which is a consequence of splitting the
+data by continguous years. This raises concerns about how generalizable
+our models are, and whether we can be certain they are strong beyond the
+1995 to 2020 period covered by the training set.
+
+\newpage
+
+## 6. Data Product
+
+We produced a well documented repo with reproducible code which does the
+following:
+
+1.  Preprocess the data
+2.  Train baseline, Gaussian Process, and Neural Network models
+3.  Evaluate trained models' performance
+
+Inside the repo are the following detailed notebooks to guide future
+users: - Full workflow using a simple NN model (includes pre & post
+processing) - Training a baseline model - Training a NN model - How to
+train a GP model on sockeye
+
+## 7. Conclusions and Recommendations
+
+Though our models did not produce incredible results, both models did
+beat the baseline and we believe this warrants further work on this
+project.
+
+### Recommended Next Steps
+
+1.  Adjust the scaling procedure to incorporate local scaling to
+    hopefully see better model performance on precipitation.
+2.  Develop sequential and/or ensemble models that use the models we
+    developed as inputs so we can leverage the strenghts of both models.
+3.  Generalize the workflow so it can be applied to additional climate
+    model data and investigate:
+    1.  Whether the models we trained on the IsoGSM data set generalize
+        well when applied to other climate models, and
+    2.  Whether models trained on data from different climate models
+        have similar performance and learn similar patterns.
+
+\newpage
+
+## 8. Appendix {#appendix}
+
+### Equations
+
+**Equation for calculation of** $\delta^{18}O$
+
+$$
+\delta^{18}O = \left(\frac{(^{18}O/^{16}O)_{sample}}{(^{18}O/^{16}O)_{VSMOW}} - 1\right) \times 1000 \,\text{‰} \,\,\,\,\,\,\,\text{(3)}
+$$ Where $(^{18}O/^{16}O)_{sample}$ is the ratio of the heavy to light
+isotope in a sample, and $(^{18}O/^{16}O)_{VSMOW}$ is the ratio in the
+Vienna Standard Mean Ocean Water [@de2020seasonal;
+@stenni2017antarctic].
+
+\newpage
+
+## 9. References

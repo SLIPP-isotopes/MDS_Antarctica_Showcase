@@ -1,0 +1,371 @@
+---
+title: ''
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    includes:
+      before_body: title.sty
+  github_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_depth: '3'
+    df_print: paged
+editor_options:
+  markdown:
+    wrap: 72
+bibliography: proposal_refs.bib
+link-citations: yes
+fontsize: 11pt
+linestretch: 1.5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+\newpage
+
+## 1. Executive Summary
+
+The isotopic composition of ice cores (i.e. $\delta^{18}O$) is a proxy
+for understanding historical climate and its variability in Antarctica.
+Our proposal aims to model the relationship between $\delta^{18}O$ and
+three climate variables: temperature, precipitation, and geopotential
+height. We will build Gaussian Process and Deep Learning models to
+predict these outcomes across space and time using simulated data obtained from
+global climate models. By the project's conclusion, we will deliver a
+reproducible and well-documented workflow to train our models and a
+Python package to apply our trained models on new data. This work will
+support climate science research in Antarctica by developing tools to
+help reconstruct polar climates going back thousands of years.
+
+\newpage
+
+## 2. Introduction
+
+### Background
+
+The earliest climate observations in Antarctica date back to 1958, when
+the first weather stations were set up [@bromwich2013central]. To
+characterize the climate before this time, scientists study water-stable
+isotopic records in ice cores dating back thousands of years
+[@stenni2017antarctic]. One such measure is the isotopic composition of
+Oxygen in precipitation, expressed as $\delta^{18}O$ (delta Oxygen-18).
+This measure can act as a proxy to estimate key climate variables such
+as temperature, precipitation, and geopotential height (see Table 1).
+
+$\delta^{18}O$ reflects a ratio of the heavy oxygen isotope $^{18}O$ to
+the light isotope $^{16}O$ in a sample of water (see
+[Appendix](#appendix) for equation). Broadly speaking, warmer
+temperatures result in more $^{18}O$ in the ice cores, since the heavier
+$^{18}O$ isotopes require more energy than $^{16}O$ to evaporate
+[@mulvaney2004past]. Precipitation processes also affect $\delta^{18}O$,
+as the heavier isotope preferentially precipitates before the lighter
+one. Finally, air circulation guides the travel paths of temperature and
+moisture, therefore also affecting $\delta^{18}O$ across Antarctica
+[@Associationsbetween18OofWaterandClimateParametersinaSimulationofAtmosphericCirculationfor197995]. We use a variable called "geopotential height" to measure air circulation. 
+
+Real ice core data is scarce, but $\delta^{18}O$ estimates can be
+generated uniformly over large areas using global climate models
+[@stevens2013atmospheric]. Climate models simulate natural processes
+with computer codes that implement complex mathematical models. These
+climate models can be extremely computationally intensive and require 
+significant computing time and resources to run [@bastos2009diagnostics], limiting their flexibility.
+
+Previous research has used linear regression with ordinary least squares
+(OLS) to model the relationship between $\delta^{18}O$ and temperature
+in data simulated from a climate model [@stenni2017antarctic]. Building
+upon this research, our project will use more powerful data science
+techniques on data obtained from the *IsoGSM* climate model [@yoshimura2008historical] 
+to model the relationships between the isotopic composition
+of precipitation and key climate variables (outlined in Table 1 below).
+
+```{r var_defs, echo=FALSE}
+var_defs <- data.frame(
+  Variable = c('$\\delta^{18}O$', 'Temperature', 'Precipitation rate', 'Geopotential height'),
+  Definition = c('Delta Oxygen-18 in precipitation (‰)', 
+                  'Air temperature 2 metres above the surface (K)', 
+                  'Rate of precipitation reaching the Earth\'s surface (mm/s)',
+                  'A vertical coordinate relative to Earth\'s mean sea level at 500 milibars (1/2 the atmosphere) (m)')
+)
+
+knitr::kable(var_defs,
+             caption = "Definitions of key climate variables for this project.") 
+```
+
+### Research Question
+
+The question which will guide our project is as follows:
+
+> *Using simulated data obtained from a global climate model, how can we model the relationship between **isotopic proxies** ($\delta^{18}O$) and weather conditions in Antarctica such as
+> **temperature**, **precipitation**, and **geopotential height***?
+
+
+### Objectives
+
+Our research question will be broken down into the following two
+objectives:
+
+1.  Implement machine learning (ML) models:
+   
+> *Using data from the IsoGSM climate model, implement Gaussian
+> Process (GP) and neural network (NN) models to predict temperature,
+> precipitation, and geopotential height ($Y$) from values of
+> $\delta^{18}O$ ($X$).*
+
+>  *(see [Proposed Modelling
+    Approaches](#pma) for more details on GP and NN models)*
+
+2.  Examine the performance of the ML models:
+
+> *After training our models, use heatmap visualizations to examine their predictive performance
+> for (1) different regions of Antarctica and for (2) predicting
+> different climate variables.*
+
+### Data Product
+
+To meet our objectives, we will deliver the following data products:
+
+1.  Workflow notebook:
+
+> *A well-documented Jupyter notebook containing a workflow detailing
+> how our models were implemented with evaluations and visualizations of
+> output metrics. It will be contained within a private GitHub
+> repository accessible by our partner.*
+
+2.  Python package:
+
+> *A ready-to-use and documented package containing functions that allow
+> the user to reproduce everything from the workflow notebook using
+> their own data set. A toy data set and example use cases will be
+> included. It will be contained within a public GitHub repository
+> accessible by anyone interested in our project.*
+
+\newpage
+
+## 3. Data Science Techniques
+
+### Dataset Description
+
+We will build models using simulation-generated data from the *IsoGSM*
+climate model. Its data is 4-dimensional; each variable has a value,
+latitude, longitude, and time axis. See Figure 1, which illustrates
+temperature values across space and time. To get a full picture of
+climate, we must predict three variables: temperature, precipitation,
+and geopotential height. These form our response variables, which we
+will predict using $\delta^{18}O$ values. Table 2 shows a sample of our data set with these
+relevant columns.
+
+```{r temp-map, echo = FALSE, out.width="95%", fig.align = 'center', fig.cap = "Sample of monthly average air temperature in Antarctica calculated from our data set."}
+knitr::include_graphics(here::here("../../img", "spacetime.png"))
+```
+
+```{r sample_data, echo=FALSE}
+sample_data <- read.csv(here::here("../../img", "proposal_sample.csv")) |>
+  dplyr::mutate(time = format(as.Date(time), "%b %Y"))
+knitr::kable(sample_data,
+             col.names = c("month", "lat", "lon", "$\\delta^{18}O$ (‰)", "GPH (m)", "Precip. (mm/s)", "Temp. (K)"),
+             caption = "Sample of relevant *IsoGSM* climate model data. Variables include the monthly average $\\delta^{18}O$ (delta Oxygen-18, per mille), GPH (geopotential height at 500 mbar, meters), precipitation rate (millimeters per second), and temperature (degrees Kelvin) values across longitude, latitude, and time dimensions.",
+             digits = c(0, 2, 2, 1, 0, 7, 0))
+```
+
+\newpage
+
+#### Data Challenges
+
+There are two significant data challenges we must overcome:
+
+1.  **Volume**. Our data has 17,000 grid points per variable per time
+    slice. Small subsets of monthly data can easily exceed one million
+    rows. We need parallelization and cloud computing resources to
+    handle this big data problem.
+
+2.  **Compatibility**. The data is in NetCDF format and handled in
+    Python using the `xArray` package [@Hoyer-2017]. This format is more
+    space efficient (see Figure 2), but does not natively integrate with some machine
+    learning packages like `sklearn` and `PyTorch` [@scikit-learn;
+    @NEURIPS2019_9015]. We need to wrap the base functions so they work
+    with our data.
+
+```{r xarray, echo = FALSE, out.width="70%", fig.align = 'center', fig.cap = 'xArray Data Structure (Hoyer and Hamman 2017)'}
+knitr::include_graphics(here::here("../../img", "xarray.png"))
+```
+
+\newpage
+
+### Proposed Modelling Approaches {#pma}
+
+#### Previous Efforts 
+
+The OLS model assumes **linearity**, i.e. there is a linear relationship between the model's input and output variables. It also assumes **independence**, i.e. that distinct observations are uncorrelated. The independence assumption does not hold for spatial-temporal climate data, and the linearity assumption likely does not hold between input isotope measurements and the output climate variables. In light of these challenges, we will propose two alternative modelling approaches. 
+
+#### Gaussian Processes 
+
+GP models were first introduced by @sacksandwilliam. A GP model extends the OLS model in a way that 
+removes the assumption of uncorrelated observations while also 
+introducing some non-linearity within the model. 
+Assuming that we have a training data set with $n$ observations, let
+$y_i$ denote the $i\text{th}$ observed value of a specific climate
+variable (e.g. temperature or precipitation), and let
+$\mathbf{x}_i = \begin{pmatrix}\delta^{18}\text{O} \ \ \text{lat}\ \ \text{lon}\ \ \text{time}\end{pmatrix}^{\intercal}$
+denote the corresponding observed values of the model's input variables.
+Analogous to OLS, a GP model has a linear regression component of the form $$
+\begin{aligned}
+     y_i &= {\beta_0 + \mathbf{\beta}^{\intercal}\mathbf{x}_i}, \,\,\,\,\,\,\,\text{(1)}
+\end{aligned} 
+$$ 
+where $\mathbf{\beta} = \begin{pmatrix}\beta_1 \ \ \beta_2\ \ \beta_3\ \ \beta_4\end{pmatrix}^{\intercal}$ is a vector of coefficients. The main difference between OLS models and GP models is in their correlation structure (for a more detailed comparison, see the [Appendix](#appendix)). Whereas an OLS model assumes that $\text{Cor}(y_i, y_j) = 0 \ \text{for } i\neq j$, a GP model assumes that observations have a correlation structure which is determined by a kernel function
+$R(\cdot\ ,\  \cdot)$: $$
+\begin{aligned}
+      {\text{Cor}(y_i, y_j) = }\underset{\text{kernel function}}{\underbrace{ {R(\mathbf{x}_i, \mathbf{x}_j)}}}\in[0,1] \,\,\,\,\,\,\,\text{(2)}
+\end{aligned}
+$$
+The kernel function models the correlation between observations as a
+function of their distance. Although a GP has a linear regression
+component, a kernel function can be non-linear, and as such GP models
+are capable of modelling non-linear relationships. There are many kernel functions available in 
+the literature [@kernels]. For example, there are
+kernel functions which are able to directly model seasonal temporal
+correlation structures [@doi:10.1098/rsta.2011.0550]. Thus, we anticipate dedicating a large amount of effort to selecting the most appropriate kernel functions.
+
+Note that GP models have some drawbacks. Like OLS, they assume normally
+distributed error terms (see [Appendix](#appendix)), and this assumption may not hold for our data. GP models are also computationally intensive because they compute pairwise distances between all training data points, resulting in exploding space and time complexities on big data. 
+This matrix must be stored as part of the trained model to generate predictions.
+
+#### Neural Networks
+
+A Neural Network (NN) model features a collection of connected nodes, called "neurons". Any NN can be represented as a graph of nodes and edges (see Figure 3). Neurons are usually organized into "layers", and any NN has at least two layers: an "input layer" whose nodes represent the model's input variables, and an "output layer" whose nodes represent the model's output variables. Thus NN models are capable of handling multivariate outputs with ease, which is an important advantage in the context of climate modelling. 
+Besides the input and output layers, NN models can have intermediate "hidden layers". The term "deep learning" (DL) refers to training NN models with more than one hidden layer. 
+
+There are many different ways to organize the neurons into layers. The "architecture" of an NN refers to the structure of the model's neurons and the connections between them. We plan to leverage the existing literature on NN architectures [@Murphy2016AnOO]. For example, there are architectures designed for
+modelling data with both spatial and temporal correlation [@10.3389/fclim.2021.656479]. Picking a
+neural network architecture is an art, and we anticipate testing out a
+variety of architectures to find one that fits best.
+
+DL models are extremely flexible "black box" models. 
+They are effective regardless of the distribution of the data, and are more efficient to train and to store compared to GP models.
+The main drawback of DL models compared to GP models is that they sacrifice 
+interpretability in favour of increased flexibility.
+
+```{r dl_diagram, echo = FALSE, fig.cap = 'Abstract representation of our proposed Deep Learning model. Hidden layers model the relationships between isotopic composition and three output climate variables (temperature, precipitation, and geopotential height) across space and time dimensions.'}
+knitr::include_graphics(here::here("../../img", "DLdiagram.png"))
+```
+
+\newpage
+
+### Success Criteria
+
+We will evaluate our models' success using RMSE (Root Mean Square Error)
+on validation data (see [Appendix](#appendix) for equation). Our project
+prioritizes exploration and interpretation over prediction accuracy;
+thus there is no benchmark RMSE we must achieve for success. Instead,
+RMSE scores will be used to compare the effectiveness of our approaches. Success means communicating to our partner where our model performs well
+in terms of prediction accuracy. For example, we could do this through
+heat map visualizations of RMSE scores across Antarctica. Our final models will impact Antarctic ice-core research by indicating
+which modeling approaches (e.g. GP kernel functions, NN architectures)
+may be most promising to continue pursuing further.
+
+\newpage
+
+## 4. Timeline
+
+The following table outlines the milestones and objectives we will aim
+to achieve throughout the 8 weeks of the capstone project.
+
+```{r timeline, echo=FALSE}
+timeline <- data.frame(
+  Week = c('1', '2', '3', '4 and 5', '6', '7', '8'),
+  Dates = c('May 1-5', 'May 8-12', 'May 15-19', 'May 22-June 2', 'June 5-9', 'June 12-16', 'June 19-23'),
+  Milestone = c('Hackathon', 'Data wrangling', 'Finalize models with small dataset', 'Finalize models with full dataset', 'Evaluate models', 'Final presentation', 'Final report and data product'),
+  Objectives = c('Understand the problem; Become familiar with the dataset; Brainstorm modeling approaches', 'Learn how to use `xArray` with machine learning models; Create small lightweight dataset; Implement a baseline dummy model', 'Implement GP and NN model on small dataset; Build reproducible modeling workflows', 'Utilize cloud computing; Implement GP amd NN models on full dataset', 'Evaluate model results; Create visualizations', 'Present resultsto the Master of Data Science cohort; Draft final report', 'Complete final report; Complete reproducible notebook deliverable; Publish Python package deliverable')
+)
+
+knitr::kable(timeline,
+             caption = "Milestones and Objectives.") 
+```
+
+\newpage
+
+## 5. Appendix {#appendix}
+
+### Equations
+
+**Equation for calculation of** $\delta^{18}O$
+
+$$
+\delta^{18}O = \left(\frac{(^{18}O/^{16}O)_{sample}}{(^{18}O/^{16}O)_{VSMOW}} - 1\right) \times 1000 \,\text{‰} \,\,\,\,\,\,\,\text{(3)}
+$$ Where $(^{18}O/^{16}O)_{sample}$ is the ratio of the heavy to light
+isotope in a sample, and $(^{18}O/^{16}O)_{VSMOW}$ is the ratio in the
+Vienna Standard Mean Ocean Water [@de2020seasonal;
+@stenni2017antarctic].
+
+**Equation for calculation of RMSE**
+
+$$
+RMSE = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(\hat{y}_i - y_i)^2} \,\,\,\,\,\,\,\text{(4)}
+$$
+Where $n$ is the number of samples, $\hat{y}_i$ is the $i-th$ predicted value, and $y_i$ is the actual value (for $i = 1, 2, ... n$) [@chai2014root].
+
+```{r table4, echo=FALSE}
+table4 <- data.frame(
+  Variable = c('delta Oxygen-18', 'Time', 'Longitude', 'Latitude', 'Temperature', 'Precipitation rate', 'Geopotential height'),
+  Name_in_IsoGSM = c('d18O_sp', 'time', 'longitude', 'latitude', 'tmp2m', 'pratesfc', 'hgtprs'), 
+  Definition = c('Delta Oxygen-18 in precipitation ', 'Which day or month the data was collected in, ranging from January 1979 to December 2020', 'Longitude coordinate where data was collected, ranging from 0 to 360 degrees', 'Latitude coordinate of where the data was collected, ranging from -90 to 90 degrees', 'Air temperature 2 metres above the surface', 'Surface precipitation rate', 'Output'),
+  Units = c('Per mille (o/oo) ', 'Day or month', 'Degrees East', 'Degrees North', 'Kelvin (K) ', 'Millimetres per second (mm/s)', 'Geopotential height at 500 milibars (i.e. 1/2 the atmosphere)'),
+  Class = c('Input', 'Coordinate', 'Coordinate', 'Coordinate', 'Output', 'Output', 'Output')
+)
+```
+
+
+### Comparison of OLS and GP models 
+
+Assuming that we have a training dataset with $n$ observations, let
+$y_i$ denote the $i\text{th}$ observed value of a specific climate
+variable (e.g. temperature or precipitation), and let
+$$
+\mathbf{x}_i = \begin{pmatrix}\delta^{18}\text{O} \ \ \text{lat}\ \ \text{lon}\ \ \text{time}\end{pmatrix}^{\intercal} \,\,\,\,\,\,\,\text{(5)}
+$$
+denote the corresponding observed values of the model's input variables.
+
+OLS regression assumes the following structure: $$
+\begin{aligned}
+     y_i &= {\beta_0 + \beta_{1}\delta^{18}\text{O}_i + \beta_{2}\text{lat}_i + \beta_{3}\text{lon}_i + \beta_{4}\text{time}_i} \ {+}\ {\epsilon_i} \,\,\,\,\,\,\,\text{(6)}
+\end{aligned}
+$$ The $\epsilon_i$ in $(1)$ denotes the $i\text{th}$ random **error
+term** corresponding to observation $i$. The error term accounts for
+deviations in the data from the assumed linear relationship (i.e. it
+accounts for the fact that the model is not perfect). The error term is
+assumed to be normally distributed with no correlation between distinct
+observations, i.e., $$
+\begin{aligned}
+      &{\epsilon_i \sim \mathcal{N}(0, \sigma^2)},\\
+      &{\text{Cor}(\epsilon_i, \epsilon_j) = 0 \quad \text{ for } i\neq  j} \,\,\,\,\,\,\,\text{(7)}\\
+\end{aligned}
+$$ 
+
+A GP model replaces $\epsilon_i$ from OLS with a stochastic term
+$Z(\mathbf{x}_i)$. It models correlation structures between distinct
+observations. The GP analog of the previous OLS model assumes the
+following model structure: $$
+\begin{aligned}
+     y_i &= {\beta_0 + \beta_{1}\delta^{18}\text{O}_i + \beta_{2}\text{lat}_i + \beta_{3}\text{lon}_i + \beta_{4}\text{time}_i} \ {+}\ {Z(\mathbf{x}_i)} \,\,\,\,\,\,\,\text{(8)}
+\end{aligned}  
+$$ The stochastic term is assumed to be (marginally) normally
+distributed, i.e. $$
+\begin{aligned}
+      &{Z(\mathbf{x}_i) \overset{marginal}\sim \mathcal{N}(0, \sigma^2)} \,\,\,\,\,\,\,\text{(9)}\\
+\end{aligned}
+$$ Further, a GP model assumes that distinct random error terms have a
+correlation structure which is determined by a kernel function
+$R(\cdot\ ,\  \cdot)$: $$
+\begin{aligned}
+      {\text{Cor}(Z(\mathbf{x}_i), Z(\mathbf{x}_j)) = }\underset{\text{kernel function}}{\underbrace{ {R(\mathbf{x}_i, \mathbf{x}_j)}}}\in[0,1] \,\,\,\,\,\,\,\text{(10)}
+\end{aligned}
+$$
+
+\newpage
+
+## 6. References

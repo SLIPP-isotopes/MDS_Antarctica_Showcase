@@ -1,0 +1,17 @@
+data/ECHAM6_2022/
+data/ECHAM_monthly/
+data/ECHAM54_2019
+data/IsoGSM/
+data/LMDZ/
+data/preprocessed/
+data/preprocessed_train_ds.nc
+data/preprocessed_valid_ds.nc
+data/preprocessed_test_ds.nc
+results/models/
+results/predictions/
+
+**/__pycache__
+**/.DS_Store
+**/.ipynb_checkpoints/
+
+jakob/

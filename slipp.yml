@@ -1,0 +1,24 @@
+# install with: conda env create -f slipp.yml 
+# activate with: conda activate slipp
+name: 'slipp'
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - cartopy=0.21.1
+  - ipykernel=6.22.0
+  - matplotlib=3.7.1
+  - netcdf4=1.6.3
+  - pandoc=3.1.3
+  - pip=23.1.2
+  - pytorch=2.0.1
+  - scikit-learn=1.2.2
+  - statsmodels=0.13.5
+  - torchmetrics=0.11.4
+  - torchvision=0.15.2
+  - xarray=2023.4.2
+  - pip:
+      - gpytorch==1.10
+      - linear-operator==0.4.0
+      - torch-summary==1.4.5
